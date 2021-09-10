@@ -1,22 +1,21 @@
 # Building a ChatBot with Deep NLP
- 
- 
- 
+
+
+
 # Importing the libraries
 import numpy as np
 import tensorflow as tf
 import time
- 
- 
- 
+
+
 ########## PART 1 - DATA PREPROCESSING ##########
- 
- 
- 
+
+
+
 # Importing the dataset
 lines = open('task_line.txt', encoding = 'utf-8', errors = 'ignore').read().split('\n')
 
- 
+
 # Creating a dictionary that maps each line and its id
 i = 0
 clean_questions = []
@@ -37,7 +36,7 @@ for question in clean_questions:
             word2count[word] = 1
         else:
             word2count[word] += 1
-            
+
 word2count = {}
 for answer in clean_answers:
     for word in answer.split():
@@ -54,7 +53,7 @@ for word,count in word2count.items():
     if count >= threshold:
         questionswords2int[word] = word_number
         word_number += 1
-        
+
 answerswords2int = {}
 word_number = 0
 for word,count in word2count.items():
@@ -68,14 +67,14 @@ for token in tokens:
     questionswords2int[token] = len(questionswords2int) + 1
 for token in tokens:
     answerswords2int[token] = len(answerswords2int) + 1
-        
+
 # creating inverse dictionary of the answerswords2int dictionary
 answersints2words = {w_i: w for w,w_i in answerswords2int.items()}
 
 # adding End Of String token to the end of every answer
 for i in range(len(clean_answers)):
     clean_answers[i] += ' <EOS>'
-    
+
 # Translating all the questions and all the answers into integers
 # and Replacing all the words that were filtered out by <OUT>
 questions_into_int =  []
@@ -95,7 +94,7 @@ for answer in clean_answers:
             ints.append(answerswords2int['<OUT>'])
         else:
             ints.append(answerswords2int[word])
-    answers_into_int.append(ints)    
+    answers_into_int.append(ints)
 
 # Sorting questions and answers by the length of questions
 sorted_clean_questions = []
@@ -107,13 +106,13 @@ for length in range(1, 10):
             sorted_clean_answers.append(answers_into_int[i[0]])
 
 ################# PART 2 - BUILDING THE SEQ2SEQ MODEL ####################
- 
+
 # Creating placeholders for the input and the target           
 def model_inputs():
-    inputs = tf.placeholder(tf.int32, [None,None], name = "input")
-    targets = tf.placeholder(tf.int32, [None,None], name = "targets")
-    lr = tf.placeholder(tf.float32, name = "learning_rate")
-    keep_prob = tf.placeholder(tf.float32, name = "keep_prob")
+    inputs = tf.compat.v1.placeholder(tf.int32, [None,None], name = "input")
+    targets = tf.compat.v1.placeholder(tf.int32, [None,None], name = "targets")
+    lr = tf.compat.v1.placeholder(tf.float32, name = "learning_rate")
+    keep_prob = tf.compat.v1.placeholder(tf.float32, name = "keep_prob")
     return inputs, targets, lr, keep_prob
 
 # Preprocessing the targets
@@ -144,8 +143,8 @@ def decode_training_set(encoder_state, decoder_cell, decoder_embedded_input, seq
                                                                               attention_values,
                                                                               attention_score_function,
                                                                               attention_construct_function,
-                                                                              name = "attn_dec_train")    
-    decoder_output, decoder_final_state, dedcoder_final_context_state = tf.contrib.seq2seq.dynamic_rnn_decoder(decoder_cell, 
+                                                                              name = "attn_dec_train")
+    decoder_output, decoder_final_state, dedcoder_final_context_state = tf.contrib.seq2seq.dynamic_rnn_decoder(decoder_cell,
                                                                                                                training_decoder_function,
                                                                                                                decoder_embedded_input,
                                                                                                                sequence_length,
@@ -156,7 +155,7 @@ def decode_training_set(encoder_state, decoder_cell, decoder_embedded_input, seq
 # Decoding the test/validation set
 def decode_test_set(encoder_state, decoder_cell, decoder_embeddings_matrix,
                     sos_id, eos_id, maximum_length, num_words,
-                    decoding_scope, output_function, keep_prob, 
+                    decoding_scope, output_function, keep_prob,
                     batch_size):
     attention_states = tf.zeros([batch_size, 1, decoder_cell.output_size])
     attention_keys, attention_values, attention_score_function, attention_construct_function = tf.contrib.seq2seq.prepare_attention(attention_states,attention_option = "bahdanau", num_units = decoder_cell.output_size)
@@ -167,11 +166,11 @@ def decode_test_set(encoder_state, decoder_cell, decoder_embeddings_matrix,
                                                                               attention_score_function,
                                                                               attention_construct_function,
                                                                               decoder_embeddings_matrix,
-                                                                              sos_id, 
-                                                                              eos_id, 
-                                                                              maximum_length, 
+                                                                              sos_id,
+                                                                              eos_id,
+                                                                              maximum_length,
                                                                               num_words,
-                                                                              name = "attn_dec_inf")    
+                                                                              name = "attn_dec_inf")
     test_predictions, decoder_final_state, dedcoder_final_context_state = tf.contrib.seq2seq.dynamic_rnn_decoder(decoder_cell,
                                                                                                                  test_decoder_function,
                                                                                                                  scope = decoding_scope)
@@ -185,7 +184,7 @@ def decoder_rnn(decoder_embedded_input, decoder_embeddings_matrix, encoder_state
         decoder_cell = tf.contrib.rnn.MultiRNNCell([lstm_dropout] * num_layers)
         weights = tf.truncated_normal_initializer(stddev = 0.1)
         biases = tf.zeros_initializer()
-        output_function = lambda x: tf.contrib.layers.fully_connected(x, 
+        output_function = lambda x: tf.contrib.layers.fully_connected(x,
                                                                       num_words,
                                                                       None,
                                                                       scope = decoding_scope,
@@ -215,7 +214,7 @@ def decoder_rnn(decoder_embedded_input, decoder_embeddings_matrix, encoder_state
 
 # Building the seq2seq model
 def seq2seq_model(inputs, targets, keep_prob, batch_size, sequence_length, answers_num_words, questions_num_words, encoder_embedding_size, decoder_embedding_size, rnn_size, num_layers, questionswords2int):
-    encoder_embedded_input = tf.contrib.layers.embed_sequence(inputs, 
+    encoder_embedded_input = tf.contrib.layers.embed_sequence(inputs,
                                                               answers_num_words + 1,
                                                               encoder_embedding_size,
                                                               initializer = tf.random_uniform_initializer(0,1))
@@ -237,7 +236,7 @@ def seq2seq_model(inputs, targets, keep_prob, batch_size, sequence_length, answe
 
 
 ######################### PART 3 - TRAINING THE SEQ2SEQ MODEL ###############################3
-    
+
 # Setting the Hyperparameters
 epochs = 100
 batch_size  = 64
@@ -251,8 +250,8 @@ min_learning_rate = 0.0001
 keep_probability = 0.5
 
 # defining a session
-tf.reset_default_graph()
-session = tf.InteractiveSession()
+tf.compat.v1.reset_default_graph()
+session = tf.compat.v1.InteractiveSession()
 
 # Loading the model inputs
 inputs, targets, lr, keep_prob = model_inputs()
@@ -268,21 +267,21 @@ training_predictions, test_predictions = seq2seq_model(tf.reverse(inputs, [-1]),
 
 # Seeting up the loss error, the optimiser and gradient clipping
 with tf.name_scope("optimization"):
-    loss_error = tf.contrib.seq2seq.sequence_loss(training_predictions, 
+    loss_error = tf.contrib.seq2seq.sequence_loss(training_predictions,
                                                   targets,
                                                   tf.ones([input_shape[0], sequence_length]))
     optimizer =  tf.train.AdamOptimizer(learning_rate)
     gradients = optimizer.compute_gradients(loss_error)
     clipped_gradients = [(tf.clip_by_value(grad_tensor, -5., 5.), grad_variable) for grad_tensor, grad_variable in gradients if grad_tensor is not None]
     optimizer_gradient_clipping = optimizer.apply_gradients(clipped_gradients)
-    
+
 # Padding the sequences wuth <PAD> tokens
 def apply_padding(batch_of_sequences, word2int):
     max_sequence_length = max([len(sequence) for sequence in batch_of_sequences])
     return [sequence + [word2int['<PAD>']] * (max_sequence_length - len(sequence)) for sequence in batch_of_sequences]
 
 # Splitting the data into batches of questions and answers
-def split_into_batches(questions, answers, batch_size):        
+def split_into_batches(questions, answers, batch_size):
     for batch_index in range(0, len(questions) // batch_size):
         start_index = batch_index * batch_size
         questions_in_batch = questions[start_index : start_index + batch_size]
@@ -290,7 +289,7 @@ def split_into_batches(questions, answers, batch_size):
         padded_questions_in_batch = np.array(apply_padding(questions_in_batch, questionswords2int))
         padded_answers_in_batch = np.array(apply_padding(answers_in_batch, answerswords2int))
         yield padded_questions_in_batch, padded_answers_in_batch
-        
+
 # Splitting the questions and answers into training and validation sets
 training_validation_split = int(len(sorted_clean_questions) * 0.15)
 training_questions = sorted_clean_questions[training_validation_split:]
@@ -312,20 +311,20 @@ for epoch in range(1, epochs + 1):
     for batch_index, (padded_questions_in_batch, padded_answers_in_batch) in enumerate(split_into_batches(training_questions, training_answers, batch_size)):
         starting_time = time.time()
         _, batch_training_loss_error = session.run([optimizer_gradient_clipping, loss_error], {inputs: padded_questions_in_batch, targets: padded_answers_in_batch, lr: learning_rate, sequence_length: padded_answers_in_batch.shape[1], keep_prob: keep_probability})
-        
+
         total_training_loss_error += batch_training_loss_error
         ending_time = time.time()
         batch_time = ending_time - starting_time
         if batch_index % batch_index_check_training_loss == 0:
             print('Epochs: {:>3}/{}, Batch: {:>4}/{}, Training_loss: {:>6.3f}, Training time on 100 Batches: {:d} seconds'.format(epoch, epochs, batch_index, len(training_questions) // batch_size, total_training_loss_error / batch_index_check_training_loss, int(batch_time * batch_index_check_training_loss)))
-            
+
             total_training_loss_error = 0
         if batch_index % batch_index_check_validation_loss == 0 and batch_index > 0:
             total_validation_loss_error = 0
             starting_time = time.time()
             for batch_index_validation, (padded_questions_in_batch, padded_answers_in_batch) in enumerate(split_into_batches(validation_questions, validation_answers, batch_size)):
                  batch_validation_loss_error = session.run(loss_error, {inputs: padded_questions_in_batch, targets: padded_answers_in_batch, lr: learning_rate, sequence_length: padded_answers_in_batch.shape[1], keep_prob: 1})
-                
+
                  total_validation_loss_error += batch_validation_loss_error
             ending_time = time.time()
             batch_time = ending_time - starting_time
@@ -351,20 +350,20 @@ for epoch in range(1, epochs + 1):
 print("Game Over")
 
 ########## PART 4 - TESTING THE SEQ2SEQ MODEL ##########
- 
- 
- 
+
+
+
 # Loading the weights and Running the session
 checkpoint = "./chatbot_weights.ckpt"
 session = tf.InteractiveSession()
 session.run(tf.global_variables_initializer())
 saver = tf.train.Saver()
 saver.restore(session, checkpoint)
- 
+
 # Converting the questions from strings to lists of encoding integers
 def convert_string2int(question, word2int):
     return [word2int.get(word, word2int['<OUT>']) for word in question.split()]
- 
+
 # Setting up the chat
 while(True):
     question = input("You: ")
@@ -390,35 +389,35 @@ while(True):
             break
     print('ChatBot: ' + answer)
 
-        
-                    
-                
-            
-        
-        
-        
 
-           
-            
-            
-            
-            
-            
-            
-            
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
